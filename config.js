@@ -6,7 +6,7 @@
 // ============================================================
 window.SCADA_CONFIG = {
   SUPABASE_URL: "https://sjnflltectnybupibfmd.supabase.co",
-  SUPABASE_PUBLISHABLE_KEY: "PEGA_AQUI_LA_CLAVE_PUBLICA",
+  SUPABASE_PUBLISHABLE_KEY: "1804123",
   MINUTOS_TENDENCIA: 15,      // ventana de las graficas
   ZONA_HORARIA: "America/Bogota"
 };
