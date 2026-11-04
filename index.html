@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QJU SCADA en vivo</title>
+<meta name="description" content="Dashboard en tiempo real del LAB SCADA QJU: nivel, PID, variador y KPI de gerencia desde Supabase.">
+<style>
+:root{
+  --bg:#0f1720; --panel:#16212d; --panel2:#1c2a38; --line:#2a3b4d;
+  --text:#e6edf3; --muted:#8fa3b8; --accent:#4c9be8; --ok:#3fb950; --warn:#e3b341; --bad:#f85149; --cyan:#39c5cf;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:#111b26;position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#2f6db0,#4c9be8);display:grid;place-items:center;font-weight:800;letter-spacing:.5px}
+.brand h1{font-size:17px;margin:0}
+.brand small{color:var(--muted)}
+.status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)} .dot.off{background:var(--bad)} .dot.wait{background:var(--warn)}
+.pill{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--panel)}
+main{max-width:1280px;margin:0 auto;padding:18px 16px 40px}
+.banner{display:none;margin-bottom:14px;padding:10px 14px;border-radius:10px;border:1px solid #6b5418;background:#2b2412;color:#f2d38a}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 10px}
+.grid{display:grid;gap:12px}
+.g6{grid-template-columns:repeat(6,1fr)} .g4{grid-template-columns:repeat(4,1fr)} .g2{grid-template-columns:2fr 1fr}
+@media(max-width:1000px){.g6{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+@media(max-width:560px){.g6{grid-template-columns:repeat(2,1fr)}}
+.card{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.tile .lbl{color:var(--muted);font-size:12px}
+.tile .val{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .unit{font-size:13px;color:var(--muted);font-weight:500;margin-left:4px}
+.tile .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.bar{height:6px;background:var(--panel2);border-radius:4px;margin-top:8px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s}
+.states{display:flex;flex-wrap:wrap;gap:8px}
+.st{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:13px}
+.st .dot{margin:0}
+.alarm{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:600}
+.alarm.ok{background:#12261a;color:#7ee2a0;border:1px solid #1f4d2e}
+.alarm.bad{background:#3a1416;color:#ffb3ae;border:1px solid #6e2226}
+.chartbox{position:relative;height:260px}
+.kpi .val{font-size:30px}
+.goal{font-size:12px;color:var(--muted)}
+.goal b.ok{color:var(--ok)} .goal b.bad{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">QJU</div>
+    <div><h1>LAB SCADA QJU · Monitoreo en tiempo real</h1><small>Control de nivel · PID · Variador G120 · KPI de gerencia</small></div>
+  </div>
+  <div class="status">
+    <span class="pill"><span id="connDot" class="dot wait"></span><span id="connTxt">Conectando…</span></span>
+    <span class="pill">Último dato: <b id="lastTs">—</b></span>
+    <span class="pill" id="ageTxt">—</span>
+  </div>
+</header>
+
+<main>
+  <div id="banner" class="banner"></div>
+
+  <h2>Proceso</h2>
+  <div class="grid g6">
+    <div class="card tile"><div class="lbl">Nivel</div><div class="val"><span id="nivel">—</span><span class="unit">cm</span></div><div class="bar"><i id="nivelBar"></i></div></div>
+    <div class="card tile"><div class="lbl">Consigna PID</div><div class="val"><span id="consigna">—</span><span class="unit">cm</span></div><div class="sub" id="errorTxt">Error: —</div></div>
+    <div class="card tile"><div class="lbl">Salida PID (bomba)</div><div class="val"><span id="salida">—</span><span class="unit">%</span></div><div class="bar"><i id="salidaBar"></i></div></div>
+    <div class="card tile"><div class="lbl">Velocidad real</div><div class="val"><span id="vreal">—</span><span class="unit">rpm</span></div><div class="sub" id="vcons">Consigna: —</div></div>
+    <div class="card tile"><div class="lbl">Sentido de giro</div><div class="val" id="sentido" style="font-size:20px">—</div><div class="sub" id="estadoPid">PID: —</div></div>
+    <div class="card tile"><div class="lbl">Energía acumulada</div><div class="val"><span id="energia">—</span><span class="unit">kWh</span></div><div class="sub" id="costoE">Costo: —</div></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="states">
+      <span class="st"><span id="sProc" class="dot"></span>Proceso en marcha</span>
+      <span class="st"><span id="sMot" class="dot"></span>Variador en marcha</span>
+      <span class="st"><span id="sPE" class="dot"></span>Paro de emergencia</span>
+      <span class="st"><span id="sAl" class="dot"></span>Alarma activa</span>
+    </div>
+    <div id="alarma" class="alarm ok">Sin alarmas: sistema normal</div>
+  </div>
+
+  <h2>Tendencias (últimos <span id="mins">15</span> min)</h2>
+  <div class="grid g2">
+    <div class="card"><div class="chartbox"><canvas id="chNivel"></canvas></div></div>
+    <div class="card"><div class="chartbox"><canvas id="chVel"></canvas></div></div>
+  </div>
+
+  <h2>KPI de gerencia</h2>
+  <div class="grid g4">
+    <div class="card tile kpi"><div class="lbl">OEE</div><div class="val"><span id="oee">—</span><span class="unit">%</span></div><div class="goal">Meta 85 % · <b id="oeeG">—</b></div></div>
+    <div class="card tile kpi"><div class="lbl">Disponibilidad</div><div class="val"><span id="disp">—</span><span class="unit">%</span></div><div class="goal">Meta 90 % · <b id="dispG">—</b></div></div>
+    <div class="card tile kpi"><div class="lbl">Rendimiento</div><div class="val"><span id="rend">—</span><span class="unit">%</span></div><div class="goal">Botellas reales / capacidad</div></div>
+    <div class="card tile kpi"><div class="lbl">Margen bruto</div><div class="val"><span id="margen">—</span><span class="unit">%</span></div><div class="goal">Meta 30 % · <b id="margenG">—</b></div></div>
+  </div>
+  <div class="grid g6" style="margin-top:12px">
+    <div class="card tile"><div class="lbl">Tiempo de operación</div><div class="val"><span id="top">—</span><span class="unit">min</span></div></div>
+    <div class="card tile"><div class="lbl">Tiempo muerto</div><div class="val"><span id="tmu">—</span><span class="unit">min</span></div><div class="sub" id="ctm">Costo: —</div></div>
+    <div class="card tile"><div class="lbl">Lotes producidos (30 und)</div><div class="val" id="lotes">—</div></div>
+    <div class="card tile"><div class="lbl">Ventas / Inventario</div><div class="val"><span id="ventas">—</span><span class="unit">/ <span id="inv">—</span> botellas</span></div></div>
+    <div class="card tile"><div class="lbl">Materia prima</div><div class="val"><span id="mat">—</span><span class="unit">L</span></div><div class="sub" id="cmat">Costo: —</div></div>
+    <div class="card tile"><div class="lbl">Ingresos</div><div class="val" id="ing" style="font-size:22px">—</div></div>
+  </div>
+
+  <h2>Reportes generados</h2>
+  <div class="grid g2">
+    <div class="card"><b>Supervisor</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Ventana</th><th>Nivel prom.</th><th>Error prom.</th><th>Vel. prom.</th><th>Alarmas</th></tr></thead><tbody id="tSup"><tr><td colspan="6">—</td></tr></tbody></table></div></div>
+    <div class="card"><b>Gerencia</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>OEE</th><th>Lotes</th><th>Ingresos</th></tr></thead><tbody id="tGer"><tr><td colspan="4">—</td></tr></tbody></table></div></div>
+  </div>
+
+  <footer>Datos: PLC S7-1500 → programa del PC (Python) → Supabase (PostgreSQL). Esta página solo lee; no puede mandar órdenes al proceso.</footer>
+</main>
+
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+"use strict";
+const CFG = Object.assign({MINUTOS_TENDENCIA:15, ZONA_HORARIA:"America/Bogota"}, window.SCADA_CONFIG||{});
+const params = new URLSearchParams(location.search);
+const sinClave = !CFG.SUPABASE_KEY && (!CFG.SUPABASE_PUBLISHABLE_KEY || CFG.SUPABASE_PUBLISHABLE_KEY.startsWith("PEGA_"));
+const DEMO = params.has("demo") || sinClave;
+const KEY = CFG.SUPABASE_PUBLISHABLE_KEY || CFG.SUPABASE_KEY;
+const $ = id => document.getElementById(id);
+const ALARMAS = {0:"Sin alarmas: sistema normal",1:"PARO DE EMERGENCIA activado",2:"FALLA DEL VARIADOR",3:"FALLA DEL SENSOR de nivel",4:"NIVEL ALTO",5:"NIVEL BAJO",6:"SIN MATERIA PRIMA"};
+const PID_ST = {0:"Inactivo",1:"Optimización inicial",2:"Optimización fina",3:"Automático",4:"Manual",5:"Valor sustitutivo",6:"Error"};
+const fmt = (v,d=1) => (v===null||v===undefined||isNaN(v)) ? "—" : Number(v).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cop = v => (v===null||v===undefined||isNaN(v)) ? "—" : "$ " + Number(v).toLocaleString("es-CO",{maximumFractionDigits:0});
+const hora = ts => new Date(ts).toLocaleString("es-CO",{timeZone:CFG.ZONA_HORARIA,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+const fecha = ts => new Date(ts).toLocaleString("es-CO",{timeZone:CFG.ZONA_HORARIA,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+$("mins").textContent = CFG.MINUTOS_TENDENCIA;
+
+let lastTs = null;
+function setConn(state, txt){ $("connDot").className = "dot " + state; $("connTxt").textContent = txt; }
+function banner(txt){ const b=$("banner"); b.style.display = txt ? "block":"none"; b.textContent = txt||""; }
+function dot(id, on, color){ const e=$(id); e.className="dot"; e.style.background = on ? color : ""; e.style.boxShadow = on ? "0 0 8px "+color : ""; }
+
+// ---------- graficas ----------
+Chart.defaults.color = "#8fa3b8"; Chart.defaults.borderColor = "#2a3b4d"; Chart.defaults.font.family = "Segoe UI, system-ui, sans-serif";
+const baseOpts = (yTitle) => ({responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
+  plugins:{legend:{labels:{boxWidth:12}}},
+  scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:yTitle}}}});
+const chNivel = new Chart($("chNivel"),{type:"line",data:{labels:[],datasets:[
+  {label:"Nivel (cm)",data:[],borderColor:"#4c9be8",backgroundColor:"rgba(76,155,232,.12)",fill:true,pointRadius:0,tension:.25,borderWidth:2},
+  {label:"Consigna (cm)",data:[],borderColor:"#e3b341",borderDash:[6,4],pointRadius:0,borderWidth:2},
+  {label:"Salida PID (%)",data:[],borderColor:"#39c5cf",pointRadius:0,borderWidth:1.5,yAxisID:"y2"}]},
+  options:Object.assign(baseOpts("cm"),{scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:"cm"},min:0},y2:{position:"right",min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:"%"}}}})});
+const chVel = new Chart($("chVel"),{type:"line",data:{labels:[],datasets:[
+  {label:"Velocidad real (rpm)",data:[],borderColor:"#3fb950",pointRadius:0,borderWidth:2,tension:.25},
+  {label:"Consigna (rpm)",data:[],borderColor:"#8fa3b8",borderDash:[6,4],pointRadius:0,borderWidth:1.5}]},
+  options:baseOpts("rpm")});
+
+const serie = []; // lecturas en ventana
+function pushLectura(r){
+  serie.push(r);
+  const limite = Date.now() - CFG.MINUTOS_TENDENCIA*60000;
+  while (serie.length && new Date(serie[0].ts).getTime() < limite) serie.shift();
+}
+function redrawCharts(){
+  const lab = serie.map(r=>hora(r.ts));
+  chNivel.data.labels = lab; chVel.data.labels = lab;
+  chNivel.data.datasets[0].data = serie.map(r=>r.nivel_cm);
+  chNivel.data.datasets[1].data = serie.map(r=>r.consigna_cm);
+  chNivel.data.datasets[2].data = serie.map(r=>r.salida_pid_pct);
+  chVel.data.datasets[0].data = serie.map(r=>r.vel_real_rpm);
+  chVel.data.datasets[1].data = serie.map(r=>r.vel_consigna_rpm);
+  chNivel.update("none"); chVel.update("none");
+}
+
+// ---------- pintar ----------
+function pintarLectura(r){
+  lastTs = r.ts; $("lastTs").textContent = hora(r.ts);
+  $("nivel").textContent = fmt(r.nivel_cm,2);
+  $("nivelBar").style.width = Math.max(0,Math.min(100,(r.nivel_cm||0)*10)) + "%";
+  $("consigna").textContent = fmt(r.consigna_cm,2);
+  $("errorTxt").textContent = "Error: " + fmt((r.consigna_cm??0)-(r.nivel_cm??0),2) + " cm";
+  $("salida").textContent = fmt(r.salida_pid_pct,1);
+  $("salidaBar").style.width = Math.max(0,Math.min(100,r.salida_pid_pct||0)) + "%";
+  $("vreal").textContent = fmt(r.vel_real_rpm,0);
+  $("vcons").textContent = "Consigna: " + fmt(r.vel_consigna_rpm,0) + " rpm";
+  $("sentido").textContent = r.sentido===1 ? "↻ Horario" : r.sentido===-1 ? "↺ Antihorario" : "Sin sentido";
+  $("estadoPid").textContent = "PID: " + (PID_ST[r.estado_pid] ?? r.estado_pid ?? "—");
+  dot("sProc", r.proceso_activo, "#3fb950"); dot("sMot", r.motor_marcha, "#3fb950");
+  dot("sPE", r.pe_activo, "#f85149"); dot("sAl", r.alarma_activa, "#f85149");
+  const a = $("alarma"); const cod = r.alarma_codigo||0;
+  a.textContent = ALARMAS[cod] || ("Alarma código " + cod);
+  a.className = "alarm " + (cod ? "bad" : "ok");
+}
+function meta(id, v, objetivo){ const e=$(id); if(v===null||v===undefined){e.textContent="—";e.className="";return;} const ok=v>=objetivo; e.textContent = ok?"cumple":"no cumple"; e.className = ok?"ok":"bad"; }
+function pintarKpi(k){
+  $("oee").textContent = fmt(k.oee_pct,1); meta("oeeG",k.oee_pct,85);
+  $("disp").textContent = fmt(k.disponibilidad_pct,1); meta("dispG",k.disponibilidad_pct,90);
+  $("rend").textContent = fmt(k.rendimiento_pct,1);
+  $("margen").textContent = fmt(k.margen_bruto_pct,1); meta("margenG",k.margen_bruto_pct,30);
+  $("top").textContent = fmt(k.tiempo_operacion_min,1);
+  $("tmu").textContent = fmt(k.tiempo_muerto_min,1); $("ctm").textContent = "Costo: " + cop(k.costo_tiempo_muerto);
+  $("lotes").textContent = k.lotes_producidos ?? "—";
+  $("ventas").textContent = k.ventas ?? "—"; $("inv").textContent = k.inventario ?? "—";
+  $("mat").textContent = fmt(k.material_l,3); $("cmat").textContent = "Costo: " + cop(k.costo_material);
+  $("ing").textContent = cop(k.ingresos);
+  $("energia").textContent = fmt(k.energia_kwh,4); $("costoE").textContent = "Costo: " + cop(k.costo_energia);
+}
+function pintarReportes(sup, ger){
+  $("tSup").innerHTML = sup.length ? sup.map(r=>`<tr><td>${fecha(r.ts)}</td><td>${fmt(r.ventana_min,0)} min</td><td>${fmt(r.nivel_prom_cm,2)} cm</td><td>${fmt(r.error_prom_cm,2)} cm</td><td>${fmt(r.vel_real_prom_rpm,0)} rpm</td><td>${r.eventos_alarma ?? 0}</td></tr>`).join("") : '<tr><td colspan="6">Aún no hay reportes</td></tr>';
+  $("tGer").innerHTML = ger.length ? ger.map(r=>`<tr><td>${fecha(r.ts)}</td><td>${fmt(r.oee_pct,1)} %</td><td>${r.lotes_producidos ?? 0}</td><td>${cop(r.ingresos)}</td></tr>`).join("") : '<tr><td colspan="4">Aún no hay reportes</td></tr>';
+}
+setInterval(()=>{
+  if(!lastTs){ $("ageTxt").textContent="Sin datos"; return; }
+  const s = Math.round((Date.now()-new Date(lastTs).getTime())/1000);
+  $("ageTxt").textContent = s<60 ? `hace ${s} s` : `hace ${Math.round(s/60)} min`;
+  if(!DEMO){ if(s>30) setConn("wait","Sin datos nuevos (¿PC o PLC apagado?)"); }
+},1000);
+
+// ---------- modo demostracion ----------
+function demo(){
+  banner("Modo demostración: datos simulados. Pega la clave pública en config.js para ver los datos reales.");
+  setConn("wait","Demostración");
+  let t = Date.now() - CFG.MINUTOS_TENDENCIA*60000, nivel=2, oper=0, lotes=0, ventas=0, e=0, lleno=false;
+  const paso = () => {
+    const sp = 6 + Math.sin(t/240000)*1.5;
+    const u = Math.max(0,Math.min(100, 55 + (sp-nivel)*25));
+    nivel += (u/100*0.09 - 0.04) + (Math.random()-.5)*0.02;
+    const vel = 600 + nivel*110, run = nivel>2;
+    if(run) oper += 1/60;
+    if(!lleno && nivel>=7.9){lotes++;lleno=true} if(lleno && nivel<=2.1){ventas++;lleno=false}
+    e += (19.2+5.5)/0.85/3.6e6 + (36*u/100)/0.85/3.6e6 + (run?763*Math.pow(vel/1735,3)/3.6e6:0);
+    const r = {ts:new Date(t).toISOString(),nivel_cm:nivel,consigna_cm:sp,salida_pid_pct:u,vel_real_rpm:run?vel+(Math.random()-.5)*20:0,vel_consigna_rpm:run?vel:0,sentido:1,alarma_codigo:0,estado_pid:3,proceso_activo:true,motor_marcha:run,pe_activo:false,alarma_activa:false};
+    return {r,k:{oee_pct:83.4,disponibilidad_pct:96.2,rendimiento_pct:86.7,margen_bruto_pct:41.2,tiempo_operacion_min:oper,tiempo_muerto_min:1.8,costo_tiempo_muerto:820,lotes_producidos:lotes,ventas,inventario:lotes-ventas,material_l:lotes*0.17,costo_material:lotes*0.17*10.96,ingresos:ventas*0.17*2650,energia_kwh:e,costo_energia:e*863.61}};
+  };
+  while(t < Date.now()){ const {r} = paso(); pushLectura(r); t += 1000; }
+  const tick = () => { const {r,k} = paso(); t = Date.now(); r.ts = new Date().toISOString(); pushLectura(r); pintarLectura(r); pintarKpi(k); redrawCharts(); };
+  tick(); setInterval(tick, 1000);
+  pintarReportes([{ts:new Date(Date.now()-3600e3).toISOString(),ventana_min:60,nivel_prom_cm:5.9,error_prom_cm:0.12,vel_real_prom_rpm:1240,eventos_alarma:0}],
+                 [{ts:new Date(Date.now()-1800e3).toISOString(),oee_pct:82.1,lotes_producidos:4,ingresos:1802}]);
+}
+
+// ---------- datos reales ----------
+async function real(){
+  if(!window.supabase){ setConn("off","No cargó la librería de Supabase"); return; }
+  const sb = window.supabase.createClient(CFG.SUPABASE_URL, KEY, {auth:{persistSession:false}});
+  const desde = new Date(Date.now() - CFG.MINUTOS_TENDENCIA*60000).toISOString();
+  const cols = "ts,nivel_cm,consigna_cm,salida_pid_pct,vel_real_rpm,vel_consigna_rpm,sentido,alarma_codigo,estado_pid,proceso_activo,motor_marcha,pe_activo,alarma_activa";
+
+  async function cargarTodo(){
+    const [lec, kpi, sup, ger] = await Promise.all([
+      sb.from("lecturas").select(cols).gte("ts",desde).order("ts",{ascending:true}).limit(5000),
+      sb.from("kpis").select("*").order("ts",{ascending:false}).limit(1),
+      sb.from("reportes_supervisor").select("*").order("ts",{ascending:false}).limit(8),
+      sb.from("reportes_gerencia").select("*").order("ts",{ascending:false}).limit(8)]);
+    const err = lec.error || kpi.error || sup.error || ger.error;
+    if(err){ setConn("off","Error: " + err.message); banner("No se pudo leer Supabase. Revisa la clave pública en config.js y que ejecutaste supabase_lectura_publica.sql."); return false; }
+    serie.length = 0; (lec.data||[]).forEach(pushLectura);
+    if(serie.length) pintarLectura(serie[serie.length-1]);
+    else { const u = await sb.from("lecturas").select(cols).order("ts",{ascending:false}).limit(1); if(u.data && u.data[0]) pintarLectura(u.data[0]); }
+    if(kpi.data && kpi.data[0]) pintarKpi(kpi.data[0]);
+    pintarReportes(sup.data||[], ger.data||[]);
+    redrawCharts(); banner(""); return true;
+  }
+
+  if(!(await cargarTodo())) { setTimeout(real, 10000); return; }
+  setConn("wait","Conectando a tiempo real…");
+
+  let realtimeOk = false;
+  sb.channel("scada")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"lecturas"}, p => { pushLectura(p.new); pintarLectura(p.new); redrawCharts(); })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"kpis"}, p => pintarKpi(p.new))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_supervisor"}, () => cargarTodo())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_gerencia"}, () => cargarTodo())
+    .subscribe(status => {
+      if(status === "SUBSCRIBED"){ realtimeOk = true; setConn("on","En vivo (tiempo real)"); }
+      else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ realtimeOk = false; setConn("wait","Actualizando cada 5 s"); }
+    });
+
+  // Respaldo: si el tiempo real no esta disponible, consulta cada 5 s
+  setInterval(async () => {
+    if(realtimeOk) return;
+    const ult = lastTs || desde;
+    const r = await sb.from("lecturas").select(cols).gt("ts",ult).order("ts",{ascending:true}).limit(500);
+    if(!r.error && r.data){ r.data.forEach(pushLectura); if(r.data.length){ pintarLectura(r.data[r.data.length-1]); redrawCharts(); } }
+    const k = await sb.from("kpis").select("*").order("ts",{ascending:false}).limit(1);
+    if(!k.error && k.data && k.data[0]) pintarKpi(k.data[0]);
+  }, 5000);
+}
+
+DEMO ? demo() : real();
+})();
+</script>
+</body>
+</html>
