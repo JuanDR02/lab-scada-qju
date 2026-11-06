@@ -46,6 +46,9 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .kpi .val{font-size:30px}
 .goal{font-size:12px;color:var(--muted)}
 .goal b.ok{color:var(--ok)} .goal b.bad{color:var(--bad)}
+.est{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.est.pendiente{background:#2b2412;color:#f2d38a} .est.ejecutado{background:#12261a;color:#7ee2a0}
+.est.rechazado,.est.vencido{background:#3a1416;color:#ffb3ae}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{color:var(--muted);font-weight:600}
@@ -129,13 +132,25 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
     </div>
   </div>
 
+  <h2>Comandos del gemelo hacia el PLC</h2>
+  <div class="card">
+    <div class="states" style="margin-bottom:10px">
+      <span class="st"><span id="pDot" class="dot"></span><span id="pEstado">Puente PC → PLC sin datos</span></span>
+      <span class="st">PLC: <b id="pPlc" style="margin-left:4px">—</b></span>
+      <span class="st">Escritura en el PLC: <b id="pEsc" style="margin-left:4px">—</b></span>
+      <span class="st">Ejecutados: <b id="pN" style="margin-left:4px">—</b></span>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Hora</th><th>Origen</th><th>Comando</th><th>Valor</th><th>Estado</th><th>Atendido</th><th>Detalle</th></tr></thead><tbody id="tCmd"><tr><td colspan="7">—</td></tr></tbody></table></div>
+    <div class="goal" style="margin-top:8px">Unity, con sesión de operador, escribe en <code>comandos_planta</code>. El programa del PC del laboratorio los toma, los escribe en DB_Gemelo del PLC y los marca como ejecutados. Los que lleven más de 30 s sin atender se marcan vencidos y no se ejecutan.</div>
+  </div>
+
   <h2>Reportes generados</h2>
   <div class="grid g2">
     <div class="card"><b>Supervisor</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Ventana</th><th>Nivel prom.</th><th>Error prom.</th><th>Vel. prom.</th><th>Alarmas</th></tr></thead><tbody id="tSup"><tr><td colspan="6">—</td></tr></tbody></table></div></div>
     <div class="card"><b>Gerencia</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>OEE</th><th>Lotes</th><th>Ingresos</th></tr></thead><tbody id="tGer"><tr><td colspan="4">—</td></tr></tbody></table></div></div>
   </div>
 
-  <footer>Datos: PLC S7-1500 → programa del PC (Python) → Supabase (PostgreSQL). Esta página solo lee; no puede mandar órdenes al proceso.</footer>
+  <footer>Datos: PLC S7-1500 ↔ programa del PC (Python) ↔ Supabase (PostgreSQL) ↔ gemelo en Unity. Esta página solo lee: las órdenes salen del gemelo con sesión de operador.</footer>
 </main>
 
 <script src="config.js"></script>
@@ -257,6 +272,28 @@ function pintarGemelo(g){
   $("gAl").textContent = "Alarmas: " + (g.alarmas ? g.alarmas : "ninguna");
 }
 
+// ---------- comandos y puente PC -> PLC ----------
+const NOMBRE_CMD = {start:"START", stop:"STOP", pe:"PARO DE EMERGENCIA", reset:"RESET", consigna:"Consigna", receta:"Receta", sentido:"Sentido de giro"};
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function pintarComandos(filas){
+  $("tCmd").innerHTML = filas.length ? filas.slice(0,15).map(c => {
+    let v = c.valor;
+    if (c.tipo === "sentido") v = v > 0 ? "Horario" : "Antihorario";
+    else if (c.tipo === "consigna") v = fmt(v,1) + " cm";
+    else v = v === null || v === undefined ? "" : v;
+    return `<tr><td>${fecha(c.creado)}</td><td>${c.origen === "gemelo_unity" ? "Unity" : "Web"}</td><td>${NOMBRE_CMD[c.tipo] || esc(c.tipo)}</td><td>${esc(v)}</td><td><span class="est ${esc(c.estado)}">${esc(c.estado)}</span></td><td>${c.atendido ? hora(c.atendido) : ""}</td><td>${esc(c.detalle)}</td></tr>`;
+  }).join("") : '<tr><td colspan="7">Aún no hay comandos</td></tr>';
+}
+function pintarPuente(p){
+  if(!p){ $("pDot").className = "dot off"; $("pEstado").textContent = "Puente PC → PLC: el programa del PC no ha reportado"; return; }
+  const s = (Date.now() - new Date(p.ts).getTime())/1000, vivo = s < 20;
+  $("pDot").className = "dot " + (vivo ? (p.plc_conectado ? "on" : "wait") : "off");
+  $("pEstado").textContent = (vivo ? "Puente PC → PLC activo" : "Puente PC → PLC detenido") + " · " + (s < 120 ? `hace ${Math.round(s)} s` : fecha(p.ts)) + (p.modo === "SIMULACION" ? " · simulación" : "");
+  $("pPlc").textContent = p.plc_conectado ? "conectado" : "sin conexión";
+  $("pEsc").textContent = p.escritura_plc ? ("habilitada (DB" + p.db_gemelo + ")") : "deshabilitada";
+  $("pN").textContent = p.comandos_ejecutados ?? 0;
+}
+
 // ---------- modo demostracion ----------
 function demo(){
   banner("Modo demostración: datos simulados. Pega la clave pública en config.js para ver los datos reales.");
@@ -305,8 +342,14 @@ async function real(){
 
   if(!(await cargarTodo())) { setTimeout(real, 10000); return; }
   async function cargarGemelo(){ const g = await sb.from("gemelo_estado").select("*").order("ts",{ascending:false}).limit(1); if(!g.error && g.data && g.data[0]) pintarGemelo(g.data[0]); }
-  await cargarGemelo();
+  async function cargarComandos(){
+    const [c, p] = await Promise.all([sb.from("comandos_publicos").select("*").limit(15), sb.from("puente_estado").select("*").limit(1)]);
+    if(!c.error && c.data) pintarComandos(c.data);
+    if(!p.error) pintarPuente(p.data && p.data[0]);
+  }
+  await cargarGemelo(); await cargarComandos();
   setInterval(cargarGemelo, 3000);
+  setInterval(cargarComandos, 3000);
   setConn("wait","Conectando a tiempo real…");
 
   let realtimeOk = false;
