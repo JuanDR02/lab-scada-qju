@@ -251,7 +251,7 @@ setInterval(()=>{
   if(!lastTs){ $("ageTxt").textContent="Sin datos"; return; }
   const s = Math.round((Date.now()-new Date(lastTs).getTime())/1000);
   $("ageTxt").textContent = s<60 ? `hace ${s} s` : `hace ${Math.round(s/60)} min`;
-  if(!DEMO){ if(s>30) setConn("wait","Sin datos nuevos (¿PC o PLC apagado?)"); }
+  if(!DEMO){ if(s>30) setConn("wait","Sin datos nuevos (¿PC o PLC apagado?)"); else if($("connTxt").textContent.startsWith("Sin datos")) setConn("on","En vivo (tiempo real)"); }
 },1000);
 
 
@@ -347,6 +347,18 @@ async function real(){
     if(!c.error && c.data) pintarComandos(c.data);
     if(!p.error) pintarPuente(p.data && p.data[0]);
   }
+  // Valor en vivo (una fila que el PC actualiza cada 0,2 s): llega por tiempo real en milisegundos
+  let vivoTs = 0, ultimoPunto = 0;
+  function recibirVivo(v){
+    if(!v || !v.ts) return;
+    const t = new Date(v.ts).getTime();
+    if(lastTs && t <= new Date(lastTs).getTime()) return;
+    vivoTs = Date.now();
+    pintarLectura(v);
+    if(t - ultimoPunto >= 1000){ ultimoPunto = t; pushLectura(v); redrawCharts(); }
+  }
+  const vivoActivo = () => Date.now() - vivoTs < 5000;
+  { const v = await sb.from("en_vivo").select("*").limit(1); if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]); }
   await cargarGemelo(); await cargarComandos();
   setInterval(cargarGemelo, 3000);
   setInterval(cargarComandos, 3000);
@@ -354,7 +366,8 @@ async function real(){
 
   let realtimeOk = false;
   sb.channel("scada")
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"lecturas"}, p => { pushLectura(p.new); pintarLectura(p.new); redrawCharts(); })
+    .on("postgres_changes",{event:"*",schema:"public",table:"en_vivo"}, p => recibirVivo(p.new))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"lecturas"}, p => { if(vivoActivo()) return; pushLectura(p.new); pintarLectura(p.new); redrawCharts(); })
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"kpis"}, p => pintarKpi(p.new))
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_supervisor"}, () => cargarTodo())
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_gerencia"}, () => cargarTodo())
@@ -367,6 +380,9 @@ async function real(){
   // Respaldo: si el tiempo real no esta disponible, consulta cada 5 s
   setInterval(async () => {
     if(realtimeOk) return;
+    const v = await sb.from("en_vivo").select("*").limit(1);
+    if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]);
+    if(vivoActivo()) return;
     const ult = lastTs || desde;
     const r = await sb.from("lecturas").select(cols).gt("ts",ult).order("ts",{ascending:true}).limit(500);
     if(!r.error && r.data){ r.data.forEach(pushLectura); if(r.data.length){ pintarLectura(r.data[r.data.length-1]); redrawCharts(); } }
