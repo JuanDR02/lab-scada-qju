@@ -111,6 +111,24 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
     <div class="card tile"><div class="lbl">Ingresos</div><div class="val" id="ing" style="font-size:22px">—</div></div>
   </div>
 
+  <h2>Gemelo digital (Unity)</h2>
+  <div class="card">
+    <div class="states" style="margin-bottom:10px">
+      <span class="st"><span id="gDot" class="dot"></span><span id="gEstado">Sin datos del gemelo</span></span>
+      <span class="st">Modo: <b id="gModo" style="margin-left:4px">—</b></span>
+      <span class="st">Etapa: <b id="gEtapa" style="margin-left:4px">—</b></span>
+      <span class="st">Línea: <b id="gLinea" style="margin-left:4px">—</b></span>
+    </div>
+    <div class="grid g6">
+      <div class="tile"><div class="lbl">h2 TK-102</div><div class="val"><span id="gH2">—</span><span class="unit">cm</span></div><div class="sub" id="gSp">Consigna: —</div></div>
+      <div class="tile"><div class="lbl">h1 TK-101 (estimado)</div><div class="val"><span id="gH1">—</span><span class="unit">cm</span></div></div>
+      <div class="tile"><div class="lbl">Salida PID</div><div class="val"><span id="gU">—</span><span class="unit">%</span></div></div>
+      <div class="tile"><div class="lbl">Agitador G120</div><div class="val"><span id="gRpm">—</span><span class="unit">rpm</span></div></div>
+      <div class="tile"><div class="lbl">Frascos llenos / tapados</div><div class="val" id="gFr" style="font-size:22px">—</div></div>
+      <div class="tile"><div class="lbl">Cajas</div><div class="val" id="gCj">—</div><div class="sub" id="gAl">Alarmas: —</div></div>
+    </div>
+  </div>
+
   <h2>Reportes generados</h2>
   <div class="grid g2">
     <div class="card"><b>Supervisor</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Ventana</th><th>Nivel prom.</th><th>Error prom.</th><th>Vel. prom.</th><th>Alarmas</th></tr></thead><tbody id="tSup"><tr><td colspan="6">—</td></tr></tbody></table></div></div>
@@ -221,6 +239,24 @@ setInterval(()=>{
   if(!DEMO){ if(s>30) setConn("wait","Sin datos nuevos (¿PC o PLC apagado?)"); }
 },1000);
 
+
+// ---------- gemelo digital ----------
+function pintarGemelo(g){
+  if(!g) return;
+  const edad = (Date.now() - new Date(g.ts).getTime())/1000;
+  const vivo = edad < 15;
+  $("gDot").className = "dot " + (vivo ? "on" : "off");
+  $("gEstado").textContent = (vivo ? "Gemelo publicando" : "Gemelo sin publicar") + " · " + fecha(g.ts);
+  $("gModo").textContent = g.modo === "Nube_Supabase" ? "Nube" : g.modo === "PLC_S7" ? "PLC" : (g.modo || "—");
+  $("gEtapa").textContent = g.etapa || "—"; $("gLinea").textContent = g.etapa_linea || "—";
+  $("gH2").textContent = fmt(g.h2_cm,2); $("gSp").textContent = "Consigna: " + fmt(g.consigna_cm,2) + " cm";
+  $("gH1").textContent = fmt(g.h1_est_cm ?? g.h1_cm,2); $("gU").textContent = fmt(g.salida_pid_pct,1);
+  $("gRpm").textContent = fmt(g.vel_rpm,0);
+  $("gFr").textContent = (g.frascos_llenos ?? 0) + " / " + (g.frascos_tapados ?? 0);
+  $("gCj").textContent = g.cajas ?? 0;
+  $("gAl").textContent = "Alarmas: " + (g.alarmas ? g.alarmas : "ninguna");
+}
+
 // ---------- modo demostracion ----------
 function demo(){
   banner("Modo demostración: datos simulados. Pega la clave pública en config.js para ver los datos reales.");
@@ -268,6 +304,9 @@ async function real(){
   }
 
   if(!(await cargarTodo())) { setTimeout(real, 10000); return; }
+  async function cargarGemelo(){ const g = await sb.from("gemelo_estado").select("*").order("ts",{ascending:false}).limit(1); if(!g.error && g.data && g.data[0]) pintarGemelo(g.data[0]); }
+  await cargarGemelo();
+  setInterval(cargarGemelo, 3000);
   setConn("wait","Conectando a tiempo real…");
 
   let realtimeOk = false;
@@ -276,6 +315,7 @@ async function real(){
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"kpis"}, p => pintarKpi(p.new))
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_supervisor"}, () => cargarTodo())
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_gerencia"}, () => cargarTodo())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"gemelo_estado"}, p => pintarGemelo(p.new))
     .subscribe(status => {
       if(status === "SUBSCRIBED"){ realtimeOk = true; setConn("on","En vivo (tiempo real)"); }
       else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ realtimeOk = false; setConn("wait","Actualizando cada 5 s"); }
