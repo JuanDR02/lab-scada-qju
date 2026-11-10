@@ -3,64 +3,165 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QJU SCADA en vivo</title>
-<meta name="description" content="Dashboard en tiempo real del LAB SCADA QJU: nivel, PID, variador y KPI de gerencia desde Supabase.">
+<title>VetClean® </title>
+<meta name="description" content="Dashboard en tiempo real">
 <style>
 :root{
-  --bg:#0f1720; --panel:#16212d; --panel2:#1c2a38; --line:#2a3b4d;
-  --text:#e6edf3; --muted:#8fa3b8; --accent:#4c9be8; --ok:#3fb950; --warn:#e3b341; --bad:#f85149; --cyan:#39c5cf;
-  --radius:12px;
+  /* Paleta VetClean® Farmacéutica / Veterinaria */
+  --bg: #091316;
+  --header-bg: #0d1a1e;
+  --panel: #112328;
+  --panel2: #162d33;
+  --panel3: #1d3940;
+  --line: #22434c;
+  --line-focus: #00838f;
+  
+  --text: #e8f3f5;
+  --muted: #8aa9b0;
+  
+  /* Acentos de marca VetClean */
+  --brand-primary: #008ba3;
+  --brand-gradient: linear-gradient(135deg, #005b66, #0097a7 60%, #43a047);
+  --accent: #26c6da;
+  --accent-glow: rgba(38, 198, 218, 0.25);
+  
+  /* Estados del sistema */
+  --ok: #43a047;
+  --ok-bg: #0d2916;
+  --ok-border: #1b5e20;
+  --warn: #fb8c00;
+  --warn-bg: #2d1c08;
+  --bad: #e53935;
+  --bad-bg: #2e0f11;
+  --bad-border: #7f1d1d;
+  --cyan: #00e5ff;
+  
+  --radius: 12px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
-header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:#111b26;position:sticky;top:0;z-index:5}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#2f6db0,#4c9be8);display:grid;place-items:center;font-weight:800;letter-spacing:.5px}
-.brand h1{font-size:17px;margin:0}
-.brand small{color:var(--muted)}
-.status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
-.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:6px;vertical-align:middle}
-.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)} .dot.off{background:var(--bad)} .dot.wait{background:var(--warn)}
-.pill{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--panel)}
-main{max-width:1280px;margin:0 auto;padding:18px 16px 40px}
-.banner{display:none;margin-bottom:14px;padding:10px 14px;border-radius:10px;border:1px solid #6b5418;background:#2b2412;color:#f2d38a}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 10px}
-.grid{display:grid;gap:12px}
-.g6{grid-template-columns:repeat(6,1fr)} .g4{grid-template-columns:repeat(4,1fr)} .g2{grid-template-columns:2fr 1fr}
-@media(max-width:1000px){.g6{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
-@media(max-width:560px){.g6{grid-template-columns:repeat(2,1fr)}}
-.card{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
-.tile .lbl{color:var(--muted);font-size:12px}
-.tile .val{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
-.tile .unit{font-size:13px;color:var(--muted);font-weight:500;margin-left:4px}
-.tile .sub{font-size:12px;color:var(--muted);margin-top:2px}
-.bar{height:6px;background:var(--panel2);border-radius:4px;margin-top:8px;overflow:hidden}
-.bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s}
-.states{display:flex;flex-wrap:wrap;gap:8px}
-.st{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font-size:13px}
-.st .dot{margin:0}
-.alarm{margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:600}
-.alarm.ok{background:#12261a;color:#7ee2a0;border:1px solid #1f4d2e}
-.alarm.bad{background:#3a1416;color:#ffb3ae;border:1px solid #6e2226}
-.chartbox{position:relative;height:260px}
-.kpi .val{font-size:30px}
-.goal{font-size:12px;color:var(--muted)}
-.goal b.ok{color:var(--ok)} .goal b.bad{color:var(--bad)}
-.est{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
-.est.pendiente{background:#2b2412;color:#f2d38a} .est.ejecutado{background:#12261a;color:#7ee2a0}
-.est.rechazado,.est.vencido{background:#3a1416;color:#ffb3ae}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{color:var(--muted);font-weight:600}
-.tablewrap{overflow-x:auto}
-footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
+body{
+  margin: 0;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 0%, #0f2c33 0%, var(--bg) 75%);
+  color: var(--text);
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  min-height: 100vh;
+}
+header{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--header-bg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.brand{display: flex; align-items: center; gap: 14px}
+.logo{
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--brand-gradient);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: .8px;
+  color: #fff;
+  box-shadow: 0 0 14px var(--accent-glow);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.brand h1{font-size: 17px; margin: 0; font-weight: 700; color: #fff}
+.brand small{color: var(--muted); display: block; font-size: 12px; margin-top: 2px}
+.status{display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 13px}
+.dot{width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: middle}
+.dot.on{background: var(--ok); box-shadow: 0 0 10px var(--ok)} 
+.dot.off{background: var(--bad); box-shadow: 0 0 10px var(--bad)} 
+.dot.wait{background: var(--warn); box-shadow: 0 0 10px var(--warn)}
+.pill{border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; background: var(--panel); box-shadow: inset 0 1px 2px rgba(0,0,0,0.2)}
+main{max-width: 1280px; margin: 0 auto; padding: 20px 18px 50px}
+.banner{display: none; margin-bottom: 16px; padding: 12px 16px; border-radius: 10px; border: 1px solid #8d6e19; background: #2d240d; color: #fce8a2}
+h2{
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--accent);
+  margin: 26px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+h2::after{
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+.grid{display: grid; gap: 12px}
+.g6{grid-template-columns: repeat(6,1fr)} .g4{grid-template-columns: repeat(4,1fr)} .g2{grid-template-columns: 2fr 1fr}
+@media(max-width:1024px){.g6{grid-template-columns: repeat(3,1fr)}.g4{grid-template-columns: repeat(2,1fr)}.g2{grid-template-columns: 1fr}}
+@media(max-width:580px){.g6{grid-template-columns: repeat(2,1fr)}}
+.card{
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 15px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.card:hover{
+  border-color: var(--line-focus);
+}
+.tile .lbl{color: var(--muted); font-size: 12px; font-weight: 500}
+.tile .val{font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; color: #fff}
+.tile .unit{font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 4px}
+.tile .sub{font-size: 12px; color: var(--muted); margin-top: 3px}
+.bar{height: 6px; background: var(--panel2); border-radius: 4px; margin-top: 9px; overflow: hidden}
+.bar>i{display: block; height: 100%; background: linear-gradient(90deg, #008ba3, var(--accent)); width: 0; transition: width .4s}
+.states{display: flex; flex-wrap: wrap; gap: 10px}
+.st{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.st .dot{margin: 0}
+.alarm{margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 10px}
+.alarm.ok{background: var(--ok-bg); color: #a5d6a7; border: 1px solid var(--ok-border)}
+.alarm.bad{background: var(--bad-bg); color: #ffcdd2; border: 1px solid var(--bad-border)}
+.chartbox{position: relative; height: 265px}
+.kpi .val{font-size: 30px; color: #fff}
+.goal{font-size: 12px; color: var(--muted)}
+.goal b.ok{color: #81c784} .goal b.bad{color: #e57373}
+.est{display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600}
+.est.pendiente{background: #382d12; color: #ffd54f} 
+.est.ejecutado{background: var(--ok-bg); color: #a5d6a7; border: 1px solid var(--ok-border)}
+.est.rechazado,.est.vencido{background: var(--bad-bg); color: #ffcdd2; border: 1px solid var(--bad-border)}
+table{width: 100%; border-collapse: collapse; font-size: 13px}
+th,td{text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap}
+th{color: var(--muted); font-weight: 600; background: var(--panel2)}
+.tablewrap{overflow-x: auto; border-radius: 8px; border: 1px solid var(--line)}
+footer{color: var(--muted); font-size: 12px; text-align: center; margin-top: 36px; padding: 16px; border-top: 1px solid var(--line)}
+code{background: var(--panel2); padding: 2px 6px; border-radius: 4px; color: var(--accent); font-size: 12px}
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
-    <div class="logo">QJU</div>
-    <div><h1>LAB SCADA QJU · Monitoreo en tiempo real</h1><small>Control de nivel · PID · Variador G120 · KPI de gerencia</small></div>
+    <div class="logo">VC</div>
+    <div>
+      <h1>VetClean®  Monitoreo en tiempo real</h1>
+      <small>Línea Antiséptica Spray 120 mL</small>
+    </div>
   </div>
   <div class="status">
     <span class="pill"><span id="connDot" class="dot wait"></span><span id="connTxt">Conectando…</span></span>
@@ -72,85 +173,85 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:28px}
 <main>
   <div id="banner" class="banner"></div>
 
-  <h2>Proceso</h2>
+  <h2>Proceso y Llenado</h2>
   <div class="grid g6">
-    <div class="card tile"><div class="lbl">Nivel</div><div class="val"><span id="nivel">—</span><span class="unit">cm</span></div><div class="bar"><i id="nivelBar"></i></div></div>
-    <div class="card tile"><div class="lbl">Consigna PID</div><div class="val"><span id="consigna">—</span><span class="unit">cm</span></div><div class="sub" id="errorTxt">Error: —</div></div>
-    <div class="card tile"><div class="lbl">Salida PID (bomba)</div><div class="val"><span id="salida">—</span><span class="unit">%</span></div><div class="bar"><i id="salidaBar"></i></div></div>
-    <div class="card tile"><div class="lbl">Velocidad real</div><div class="val"><span id="vreal">—</span><span class="unit">rpm</span></div><div class="sub" id="vcons">Consigna: —</div></div>
-    <div class="card tile"><div class="lbl">Sentido de giro</div><div class="val" id="sentido" style="font-size:20px">—</div><div class="sub" id="estadoPid">PID: —</div></div>
-    <div class="card tile"><div class="lbl">Energía acumulada</div><div class="val"><span id="energia">—</span><span class="unit">kWh</span></div><div class="sub" id="costoE">Costo: —</div></div>
+    <div class="card tile"><div class="lbl">Nivel Reactor (TK-102)</div><div class="val"><span id="nivel">—</span><span class="unit">cm</span></div><div class="bar"><i id="nivelBar"></i></div></div>
+    <div class="card tile"><div class="lbl">Consigna de Nivel</div><div class="val"><span id="consigna">—</span><span class="unit">cm</span></div><div class="sub" id="errorTxt">Error: —</div></div>
+    <div class="card tile"><div class="lbl">Mando Bomba (Salida)</div><div class="val"><span id="salida">—</span><span class="unit">%</span></div><div class="bar"><i id="salidaBar"></i></div></div>
+    <div class="card tile"><div class="lbl">Agitador / Variador</div><div class="val"><span id="vreal">—</span><span class="unit">rpm</span></div><div class="sub" id="vcons">Consigna: —</div></div>
+    <div class="card tile"><div class="lbl">Giro Agitador</div><div class="val" id="sentido" style="font-size:20px">—</div><div class="sub" id="estadoPid">Modo: —</div></div>
+    <div class="card tile"><div class="lbl">Consumo Energético</div><div class="val"><span id="energia">—</span><span class="unit">kWh</span></div><div class="sub" id="costoE">Costo: —</div></div>
   </div>
 
   <div class="card" style="margin-top:12px">
     <div class="states">
-      <span class="st"><span id="sProc" class="dot"></span>Proceso en marcha</span>
-      <span class="st"><span id="sMot" class="dot"></span>Variador en marcha</span>
+      <span class="st"><span id="sProc" class="dot"></span>Proceso VetClean en marcha</span>
+      <span class="st"><span id="sMot" class="dot"></span>Agitación G120 activa</span>
       <span class="st"><span id="sPE" class="dot"></span>Paro de emergencia</span>
       <span class="st"><span id="sAl" class="dot"></span>Alarma activa</span>
     </div>
-    <div id="alarma" class="alarm ok">Sin alarmas: sistema normal</div>
+    <div id="alarma" class="alarm ok">Sin alarmas: formulación normal</div>
   </div>
 
-  <h2>Tendencias (últimos <span id="mins">15</span> min)</h2>
+  <h2>Tendencias de Preparación (últimos <span id="mins">15</span> min)</h2>
   <div class="grid g2">
     <div class="card"><div class="chartbox"><canvas id="chNivel"></canvas></div></div>
     <div class="card"><div class="chartbox"><canvas id="chVel"></canvas></div></div>
   </div>
 
-  <h2>KPI de gerencia</h2>
+  <h2>KPI de Gerencia y Envasado</h2>
   <div class="grid g4">
-    <div class="card tile kpi"><div class="lbl">OEE</div><div class="val"><span id="oee">—</span><span class="unit">%</span></div><div class="goal">Meta 85 % · <b id="oeeG">—</b></div></div>
+    <div class="card tile kpi"><div class="lbl">OEE Global</div><div class="val"><span id="oee">—</span><span class="unit">%</span></div><div class="goal">Meta 85 % · <b id="oeeG">—</b></div></div>
     <div class="card tile kpi"><div class="lbl">Disponibilidad</div><div class="val"><span id="disp">—</span><span class="unit">%</span></div><div class="goal">Meta 90 % · <b id="dispG">—</b></div></div>
-    <div class="card tile kpi"><div class="lbl">Rendimiento</div><div class="val"><span id="rend">—</span><span class="unit">%</span></div><div class="goal">Botellas reales / capacidad</div></div>
-    <div class="card tile kpi"><div class="lbl">Margen bruto</div><div class="val"><span id="margen">—</span><span class="unit">%</span></div><div class="goal">Meta 30 % · <b id="margenG">—</b></div></div>
+    <div class="card tile kpi"><div class="lbl">Rendimiento</div><div class="val"><span id="rend">—</span><span class="unit">%</span></div><div class="goal">Envases reales / capacidad</div></div>
+    <div class="card tile kpi"><div class="lbl">Margen Bruto</div><div class="val"><span id="margen">—</span><span class="unit">%</span></div><div class="goal">Meta 30 % · <b id="margenG">—</b></div></div>
   </div>
   <div class="grid g6" style="margin-top:12px">
     <div class="card tile"><div class="lbl">Tiempo de operación</div><div class="val"><span id="top">—</span><span class="unit">min</span></div></div>
     <div class="card tile"><div class="lbl">Tiempo muerto</div><div class="val"><span id="tmu">—</span><span class="unit">min</span></div><div class="sub" id="ctm">Costo: —</div></div>
     <div class="card tile"><div class="lbl">Lotes producidos (30 und)</div><div class="val" id="lotes">—</div></div>
     <div class="card tile"><div class="lbl">Ventas / Inventario</div><div class="val"><span id="ventas">—</span><span class="unit">/ <span id="inv">—</span> botellas</span></div></div>
-    <div class="card tile"><div class="lbl">Materia prima</div><div class="val"><span id="mat">—</span><span class="unit">L</span></div><div class="sub" id="cmat">Costo: —</div></div>
-    <div class="card tile"><div class="lbl">Ingresos</div><div class="val" id="ing" style="font-size:22px">—</div></div>
+    <div class="card tile"><div class="lbl">Materia prima (Clorhexidina)</div><div class="val"><span id="mat">—</span><span class="unit">L</span></div><div class="sub" id="cmat">Costo: —</div></div>
+    <div class="card tile"><div class="lbl">Ingresos de Lote</div><div class="val" id="ing" style="font-size:22px">—</div></div>
   </div>
 
-  <h2>Gemelo digital (Unity)</h2>
+  <h2>Gemelo Digital VetClean (Unity)</h2>
   <div class="card">
-    <div class="states" style="margin-bottom:10px">
+    <div class="states" style="margin-bottom:12px">
       <span class="st"><span id="gDot" class="dot"></span><span id="gEstado">Sin datos del gemelo</span></span>
-      <span class="st">Modo: <b id="gModo" style="margin-left:4px">—</b></span>
+      <span class="st">Modo: <b id="gModo" style="margin-left:4px; color:var(--accent)">—</b></span>
       <span class="st">Etapa: <b id="gEtapa" style="margin-left:4px">—</b></span>
       <span class="st">Línea: <b id="gLinea" style="margin-left:4px">—</b></span>
     </div>
     <div class="grid g6">
-      <div class="tile"><div class="lbl">h2 TK-102</div><div class="val"><span id="gH2">—</span><span class="unit">cm</span></div><div class="sub" id="gSp">Consigna: —</div></div>
-      <div class="tile"><div class="lbl">h1 TK-101 (estimado)</div><div class="val"><span id="gH1">—</span><span class="unit">cm</span></div></div>
-      <div class="tile"><div class="lbl">Salida PID</div><div class="val"><span id="gU">—</span><span class="unit">%</span></div></div>
+      <div class="tile"><div class="lbl">h2 TK-102 (Medido)</div><div class="val"><span id="gH2">—</span><span class="unit">cm</span></div><div class="sub" id="gSp">Consigna: —</div></div>
+      <div class="tile"><div class="lbl">h1 TK-101 (Estimado)</div><div class="val"><span id="gH1">—</span><span class="unit">cm</span></div></div>
+      <div class="tile"><div class="lbl">Salida de Mando</div><div class="val"><span id="gU">—</span><span class="unit">%</span></div></div>
       <div class="tile"><div class="lbl">Agitador G120</div><div class="val"><span id="gRpm">—</span><span class="unit">rpm</span></div></div>
-      <div class="tile"><div class="lbl">Frascos llenos / tapados</div><div class="val" id="gFr" style="font-size:22px">—</div></div>
-      <div class="tile"><div class="lbl">Cajas</div><div class="val" id="gCj">—</div><div class="sub" id="gAl">Alarmas: —</div></div>
+      <div class="tile"><div class="lbl">Frascos 120 mL Llenos / Tapados</div><div class="val" id="gFr" style="font-size:22px">—</div></div>
+      <div class="tile"><div class="lbl">Cajas Empacadas</div><div class="val" id="gCj">—</div><div class="sub" id="gAl">Alarmas: —</div></div>
     </div>
   </div>
 
-  <h2>Comandos del gemelo hacia el PLC</h2>
+  <h2>Comandos y Recetas hacia el PLC</h2>
   <div class="card">
-    <div class="states" style="margin-bottom:10px">
+    <div class="states" style="margin-bottom:12px">
       <span class="st"><span id="pDot" class="dot"></span><span id="pEstado">Puente PC → PLC sin datos</span></span>
       <span class="st">PLC: <b id="pPlc" style="margin-left:4px">—</b></span>
-      <span class="st">Escritura en el PLC: <b id="pEsc" style="margin-left:4px">—</b></span>
+      <span class="st">Escritura en PLC: <b id="pEsc" style="margin-left:4px">—</b></span>
       <span class="st">Ejecutados: <b id="pN" style="margin-left:4px">—</b></span>
     </div>
     <div class="tablewrap"><table><thead><tr><th>Hora</th><th>Origen</th><th>Comando</th><th>Valor</th><th>Estado</th><th>Atendido</th><th>Detalle</th></tr></thead><tbody id="tCmd"><tr><td colspan="7">—</td></tr></tbody></table></div>
-    <div class="goal" style="margin-top:8px">Unity, con sesión de operador, escribe en <code>comandos_planta</code>. El programa del PC del laboratorio los toma, los escribe en DB_Gemelo del PLC y los marca como ejecutados. Los que lleven más de 30 s sin atender se marcan vencidos y no se ejecutan.</div>
+    <div class="goal" style="margin-top:10px">El operador emite órdenes desde Unity o Web a <code>comandos_planta</code>. El driver en PC escribe en <code>DB_Gemelo</code> del S7-1500 y reporta el estado ejecutado en Supabase.</div>
   </div>
 
-  <h2>Reportes generados</h2>
+  <h2>Reportes y Trazabilidad de Producción</h2>
   <div class="grid g2">
-    <div class="card"><b>Supervisor</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Ventana</th><th>Nivel prom.</th><th>Error prom.</th><th>Vel. prom.</th><th>Alarmas</th></tr></thead><tbody id="tSup"><tr><td colspan="6">—</td></tr></tbody></table></div></div>
-    <div class="card"><b>Gerencia</b><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>OEE</th><th>Lotes</th><th>Ingresos</th></tr></thead><tbody id="tGer"><tr><td colspan="4">—</td></tr></tbody></table></div></div>
+    <div class="card"><b>Supervisor de Turno</b><div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Fecha</th><th>Ventana</th><th>Nivel prom.</th><th>Error prom.</th><th>Vel. prom.</th><th>Alarmas</th></tr></thead><tbody id="tSup"><tr><td colspan="6">—</td></tr></tbody></table></div></div>
+    <div class="card"><b>Control Gerencial</b><div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Fecha</th><th>OEE</th><th>Lotes</th><th>Ingresos</th></tr></thead><tbody id="tGer"><tr><td colspan="4">—</td></tr></tbody></table></div></div>
   </div>
 
-  <footer>Datos: PLC S7-1500 ↔ programa del PC (Python) ↔ Supabase (PostgreSQL) ↔ gemelo en Unity. Esta página solo lee: las órdenes salen del gemelo con sesión de operador.</footer>
+  <footer>VetClean® Automation Platform · PLC Siemens S7-1500 ↔ Python Bridge ↔ Supabase (IoT) ↔ Unity Digital Twin</footer>
 </main>
 
 <script src="config.js"></script>
@@ -165,8 +266,8 @@ const sinClave = !CFG.SUPABASE_KEY && (!CFG.SUPABASE_PUBLISHABLE_KEY || CFG.SUPA
 const DEMO = params.has("demo") || sinClave;
 const KEY = CFG.SUPABASE_PUBLISHABLE_KEY || CFG.SUPABASE_KEY;
 const $ = id => document.getElementById(id);
-const ALARMAS = {0:"Sin alarmas: sistema normal",1:"PARO DE EMERGENCIA activado",2:"FALLA DEL VARIADOR",3:"FALLA DEL SENSOR de nivel",4:"NIVEL ALTO",5:"NIVEL BAJO",6:"SIN MATERIA PRIMA"};
-const PID_ST = {0:"Inactivo",1:"Optimización inicial",2:"Optimización fina",3:"Automático",4:"Manual",5:"Valor sustitutivo",6:"Error"};
+const ALARMAS = {0:"Sin alarmas: formulación normal",1:"PARO DE EMERGENCIA activado",2:"FALLA DEL VARIADOR G120",3:"FALLA SENSOR TK-102",4:"NIVEL ALTO (Riesgo derrame)",5:"NIVEL BAJO (Cavitación)",6:"SIN MATERIA PRIMA (Clorhexidina)"};
+const PID_ST = {0:"Inactivo",1:"Sintonía inicial",2:"Sintonía fina",3:"Automático",4:"Manual",5:"Sustitutivo",6:"Falla"};
 const fmt = (v,d=1) => (v===null||v===undefined||isNaN(v)) ? "—" : Number(v).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d});
 const cop = v => (v===null||v===undefined||isNaN(v)) ? "—" : "$ " + Number(v).toLocaleString("es-CO",{maximumFractionDigits:0});
 const hora = ts => new Date(ts).toLocaleString("es-CO",{timeZone:CFG.ZONA_HORARIA,hour:"2-digit",minute:"2-digit",second:"2-digit"});
@@ -176,24 +277,54 @@ $("mins").textContent = CFG.MINUTOS_TENDENCIA;
 let lastTs = null;
 function setConn(state, txt){ $("connDot").className = "dot " + state; $("connTxt").textContent = txt; }
 function banner(txt){ const b=$("banner"); b.style.display = txt ? "block":"none"; b.textContent = txt||""; }
-function dot(id, on, color){ const e=$(id); e.className="dot"; e.style.background = on ? color : ""; e.style.boxShadow = on ? "0 0 8px "+color : ""; }
+function dot(id, on, color){ const e=$(id); e.className="dot"; e.style.background = on ? color : ""; e.style.boxShadow = on ? "0 0 10px "+color : ""; }
 
-// ---------- graficas ----------
-Chart.defaults.color = "#8fa3b8"; Chart.defaults.borderColor = "#2a3b4d"; Chart.defaults.font.family = "Segoe UI, system-ui, sans-serif";
-const baseOpts = (yTitle) => ({responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
-  plugins:{legend:{labels:{boxWidth:12}}},
-  scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:yTitle}}}});
-const chNivel = new Chart($("chNivel"),{type:"line",data:{labels:[],datasets:[
-  {label:"Nivel (cm)",data:[],borderColor:"#4c9be8",backgroundColor:"rgba(76,155,232,.12)",fill:true,pointRadius:0,tension:.25,borderWidth:2},
-  {label:"Consigna (cm)",data:[],borderColor:"#e3b341",borderDash:[6,4],pointRadius:0,borderWidth:2},
-  {label:"Salida PID (%)",data:[],borderColor:"#39c5cf",pointRadius:0,borderWidth:1.5,yAxisID:"y2"}]},
-  options:Object.assign(baseOpts("cm"),{scales:{x:{ticks:{maxTicksLimit:6}},y:{title:{display:true,text:"cm"},min:0},y2:{position:"right",min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:"%"}}}})});
-const chVel = new Chart($("chVel"),{type:"line",data:{labels:[],datasets:[
-  {label:"Velocidad real (rpm)",data:[],borderColor:"#3fb950",pointRadius:0,borderWidth:2,tension:.25},
-  {label:"Consigna (rpm)",data:[],borderColor:"#8fa3b8",borderDash:[6,4],pointRadius:0,borderWidth:1.5}]},
-  options:baseOpts("rpm")});
+// ---------- graficas con paleta VetClean ----------
+Chart.defaults.color = "#8aa9b0"; 
+Chart.defaults.borderColor = "#22434c"; 
+Chart.defaults.font.family = "Segoe UI, system-ui, sans-serif";
 
-const serie = []; // lecturas en ventana
+const baseOpts = (yTitle) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: false,
+  interaction: {mode: "index", intersect: false},
+  plugins: {legend: {labels: {boxWidth: 12, color: "#e8f3f5"}}},
+  scales: {x: {ticks: {maxTicksLimit: 6}}, y: {title: {display: true, text: yTitle, color: "#8aa9b0"}}}
+});
+
+const chNivel = new Chart($("chNivel"),{
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [
+      {label: "Nivel TK-102 (cm)", data: [], borderColor: "#26c6da", backgroundColor: "rgba(38, 198, 218, 0.12)", fill: true, pointRadius: 0, tension: .25, borderWidth: 2},
+      {label: "Consigna (cm)", data: [], borderColor: "#fb8c00", borderDash: [6,4], pointRadius: 0, borderWidth: 2},
+      {label: "Mando Bomba (%)", data: [], borderColor: "#00e5ff", pointRadius: 0, borderWidth: 1.5, yAxisID: "y2"}
+    ]
+  },
+  options: Object.assign(baseOpts("cm"), {
+    scales: {
+      x: {ticks: {maxTicksLimit: 6}},
+      y: {title: {display: true, text: "cm", color: "#8aa9b0"}, min: 0},
+      y2: {position: "right", min: 0, max: 100, grid: {drawOnChartArea: false}, title: {display: true, text: "%", color: "#8aa9b0"}}
+    }
+  })
+});
+
+const chVel = new Chart($("chVel"),{
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [
+      {label: "Velocidad Mezcla (rpm)", data: [], borderColor: "#43a047", pointRadius: 0, borderWidth: 2, tension: .25},
+      {label: "Consigna (rpm)", data: [], borderColor: "#8aa9b0", borderDash: [6,4], pointRadius: 0, borderWidth: 1.5}
+    ]
+  },
+  options: baseOpts("rpm")
+});
+
+const serie = [];
 function pushLectura(r){
   serie.push(r);
   const limite = Date.now() - CFG.MINUTOS_TENDENCIA*60000;
@@ -223,8 +354,8 @@ function pintarLectura(r){
   $("vcons").textContent = "Consigna: " + fmt(r.vel_consigna_rpm,0) + " rpm";
   $("sentido").textContent = r.sentido===1 ? "↻ Horario" : r.sentido===-1 ? "↺ Antihorario" : "Sin sentido";
   $("estadoPid").textContent = "PID: " + (PID_ST[r.estado_pid] ?? r.estado_pid ?? "—");
-  dot("sProc", r.proceso_activo, "#3fb950"); dot("sMot", r.motor_marcha, "#3fb950");
-  dot("sPE", r.pe_activo, "#f85149"); dot("sAl", r.alarma_activa, "#f85149");
+  dot("sProc", r.proceso_activo, "#43a047"); dot("sMot", r.motor_marcha, "#43a047");
+  dot("sPE", r.pe_activo, "#e53935"); dot("sAl", r.alarma_activa, "#e53935");
   const a = $("alarma"); const cod = r.alarma_codigo||0;
   a.textContent = ALARMAS[cod] || ("Alarma código " + cod);
   a.className = "alarm " + (cod ? "bad" : "ok");
@@ -253,7 +384,6 @@ setInterval(()=>{
   $("ageTxt").textContent = s<60 ? `hace ${s} s` : `hace ${Math.round(s/60)} min`;
   if(!DEMO){ if(s>30) setConn("wait","Sin datos nuevos (¿PC o PLC apagado?)"); else if($("connTxt").textContent.startsWith("Sin datos")) setConn("on","En vivo (tiempo real)"); }
 },1000);
-
 
 // ---------- gemelo digital ----------
 function pintarGemelo(g){
@@ -285,7 +415,7 @@ function pintarComandos(filas){
   }).join("") : '<tr><td colspan="7">Aún no hay comandos</td></tr>';
 }
 function pintarPuente(p){
-  if(!p){ $("pDot").className = "dot off"; $("pEstado").textContent = "Puente PC → PLC: el programa del PC no ha reportado"; return; }
+  if(!p){ $("pDot").className = "dot off"; $("pEstado").textContent = "Puente PC → PLC: sin reporte"; return; }
   const s = (Date.now() - new Date(p.ts).getTime())/1000, vivo = s < 20;
   $("pDot").className = "dot " + (vivo ? (p.plc_conectado ? "on" : "wait") : "off");
   $("pEstado").textContent = (vivo ? "Puente PC → PLC activo" : "Puente PC → PLC detenido") + " · " + (s < 120 ? `hace ${Math.round(s)} s` : fecha(p.ts)) + (p.modo === "SIMULACION" ? " · simulación" : "");
@@ -294,9 +424,9 @@ function pintarPuente(p){
   $("pN").textContent = p.comandos_ejecutados ?? 0;
 }
 
-// ---------- modo demostracion ----------
+// ---------- modo demostración ----------
 function demo(){
-  banner("Modo demostración: datos simulados. Pega la clave pública en config.js para ver los datos reales.");
+  banner("Modo demostración VetClean: datos simulados de envasado spray 120 mL.");
   setConn("wait","Demostración");
   let t = Date.now() - CFG.MINUTOS_TENDENCIA*60000, nivel=2, oper=0, lotes=0, ventas=0, e=0, lleno=false;
   const paso = () => {
@@ -331,7 +461,7 @@ async function real(){
       sb.from("reportes_supervisor").select("*").order("ts",{ascending:false}).limit(8),
       sb.from("reportes_gerencia").select("*").order("ts",{ascending:false}).limit(8)]);
     const err = lec.error || kpi.error || sup.error || ger.error;
-    if(err){ setConn("off","Error: " + err.message); banner("No se pudo leer Supabase. Revisa la clave pública en config.js y que ejecutaste supabase_lectura_publica.sql."); return false; }
+    if(err){ setConn("off","Error: " + err.message); banner("No se pudo leer Supabase. Revisa la clave pública en config.js."); return false; }
     serie.length = 0; (lec.data||[]).forEach(pushLectura);
     if(serie.length) pintarLectura(serie[serie.length-1]);
     else { const u = await sb.from("lecturas").select(cols).order("ts",{ascending:false}).limit(1); if(u.data && u.data[0]) pintarLectura(u.data[0]); }
@@ -347,52 +477,9 @@ async function real(){
     if(!c.error && c.data) pintarComandos(c.data);
     if(!p.error) pintarPuente(p.data && p.data[0]);
   }
-  // Valor en vivo (una fila que el PC actualiza cada 0,2 s): llega por tiempo real en milisegundos
+
   let vivoTs = 0, ultimoPunto = 0;
   function recibirVivo(v){
     if(!v || !v.ts) return;
     const t = new Date(v.ts).getTime();
-    if(lastTs && t <= new Date(lastTs).getTime()) return;
-    vivoTs = Date.now();
-    pintarLectura(v);
-    if(t - ultimoPunto >= 1000){ ultimoPunto = t; pushLectura(v); redrawCharts(); }
-  }
-  const vivoActivo = () => Date.now() - vivoTs < 5000;
-  { const v = await sb.from("en_vivo").select("*").limit(1); if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]); }
-  await cargarGemelo(); await cargarComandos();
-  setInterval(cargarGemelo, 3000);
-  setInterval(cargarComandos, 3000);
-  setConn("wait","Conectando a tiempo real…");
-
-  let realtimeOk = false;
-  sb.channel("scada")
-    .on("postgres_changes",{event:"*",schema:"public",table:"en_vivo"}, p => recibirVivo(p.new))
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"lecturas"}, p => { if(vivoActivo()) return; pushLectura(p.new); pintarLectura(p.new); redrawCharts(); })
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"kpis"}, p => pintarKpi(p.new))
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_supervisor"}, () => cargarTodo())
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_gerencia"}, () => cargarTodo())
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"gemelo_estado"}, p => pintarGemelo(p.new))
-    .subscribe(status => {
-      if(status === "SUBSCRIBED"){ realtimeOk = true; setConn("on","En vivo (tiempo real)"); }
-      else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ realtimeOk = false; setConn("wait","Actualizando cada 5 s"); }
-    });
-
-  // Respaldo: si el tiempo real no esta disponible, consulta cada 5 s
-  setInterval(async () => {
-    if(realtimeOk) return;
-    const v = await sb.from("en_vivo").select("*").limit(1);
-    if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]);
-    if(vivoActivo()) return;
-    const ult = lastTs || desde;
-    const r = await sb.from("lecturas").select(cols).gt("ts",ult).order("ts",{ascending:true}).limit(500);
-    if(!r.error && r.data){ r.data.forEach(pushLectura); if(r.data.length){ pintarLectura(r.data[r.data.length-1]); redrawCharts(); } }
-    const k = await sb.from("kpis").select("*").order("ts",{ascending:false}).limit(1);
-    if(!k.error && k.data && k.data[0]) pintarKpi(k.data[0]);
-  }, 5000);
-}
-
-DEMO ? demo() : real();
-})();
-</script>
-</body>
-</html>
+    if(lastTs && t <= new Date(lastTs).getTime())
