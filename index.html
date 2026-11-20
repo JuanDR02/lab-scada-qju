@@ -482,4 +482,47 @@ async function real(){
   function recibirVivo(v){
     if(!v || !v.ts) return;
     const t = new Date(v.ts).getTime();
-    if(lastTs && t <= new Date(lastTs).getTime())
+    if(lastTs && t <= new Date(lastTs).getTime()) return;
+    vivoTs = Date.now();
+    pintarLectura(v);
+    if(t - ultimoPunto >= 1000){ ultimoPunto = t; pushLectura(v); redrawCharts(); }
+  }
+  const vivoActivo = () => Date.now() - vivoTs < 5000;
+  { const v = await sb.from("en_vivo").select("*").limit(1); if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]); }
+  await cargarGemelo(); await cargarComandos();
+  setInterval(cargarGemelo, 3000);
+  setInterval(cargarComandos, 3000);
+  setConn("wait","Conectando a tiempo real…");
+
+  let realtimeOk = false;
+  sb.channel("scada")
+    .on("postgres_changes",{event:"*",schema:"public",table:"en_vivo"}, p => recibirVivo(p.new))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"lecturas"}, p => { if(vivoActivo()) return; pushLectura(p.new); pintarLectura(p.new); redrawCharts(); })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"kpis"}, p => pintarKpi(p.new))
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_supervisor"}, () => cargarTodo())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"reportes_gerencia"}, () => cargarTodo())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"gemelo_estado"}, p => pintarGemelo(p.new))
+    .subscribe(status => {
+      if(status === "SUBSCRIBED"){ realtimeOk = true; setConn("on","En vivo (tiempo real)"); }
+      else if(status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED"){ realtimeOk = false; setConn("wait","Actualizando cada 5 s"); }
+    });
+
+  // Respaldo: si el tiempo real no esta disponible, consulta cada 5 s
+  setInterval(async () => {
+    if(realtimeOk) return;
+    const v = await sb.from("en_vivo").select("*").limit(1);
+    if(!v.error && v.data && v.data[0]) recibirVivo(v.data[0]);
+    if(vivoActivo()) return;
+    const ult = lastTs || desde;
+    const r = await sb.from("lecturas").select(cols).gt("ts",ult).order("ts",{ascending:true}).limit(500);
+    if(!r.error && r.data){ r.data.forEach(pushLectura); if(r.data.length){ pintarLectura(r.data[r.data.length-1]); redrawCharts(); } }
+    const k = await sb.from("kpis").select("*").order("ts",{ascending:false}).limit(1);
+    if(!k.error && k.data && k.data[0]) pintarKpi(k.data[0]);
+  }, 5000);
+}
+
+DEMO ? demo() : real();
+})();
+</script>
+</body>
+</html>
